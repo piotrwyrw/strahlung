@@ -28,17 +28,46 @@
 				(setf (vec-z vec) (/ (vec-z vec) magnitude))
 				vec))))
 
-(defparameter center-vec
-	(make-instance 'vec3d
-		:x 0
-		:y 12
-		:z 53))
-
 (defun screen-ray-direction (screen-x screen-y)
 	(make-instance 'vec3d
 		:x (+ -1.0 (* (/ 2.0 *screen-width*) screen-x))
 		:y (- 1.0 (* (/ 2.0 *screen-height*) screen-y))
 		:z *focal-length*))
 
-(defvar sr-direction (screen-ray-direction 0 0))
-(inspect sr-direction)
+(defclass ray ()
+	((origin	:initarg :origin
+			:accessor ray-origin)
+	 (direction	:initarg :direction
+			:accessor ray-direction)))
+
+(defclass shape () ())
+
+(defclass sphere (shape)
+	((center	:initarg :center
+			:accessor sphere-center)
+	 (radius	:initarg :radius
+			:accessor sphere-radius)))
+
+(defgeneric ray-vs-shape (ray shape))
+
+(defclass intersect ()
+	((shape		:initarg :shape
+			:accessor intersect-shape)
+	 (ray		:initarg :ray
+			:accessor intersect-ray)
+	 (point		:initarg :point
+			:accessor intersect-point)
+	 (distance	:initarg :distance
+			:accessor intersect-distance
+			:documentation "The distance along the ray to the intersection point")))
+
+(defmethod ray-vs-shape ((ray ray) (shape sphere))
+	(print "Hello, World!")) ;; TODO Implement the intersection equation here
+
+(defvar sample-sphere (make-instance 'sphere :center (screen-ray-direction 3 2) :radius 2.3))
+(defvar sample-ray (make-instance 'ray :origin (screen-ray-direction 3 2) :direction (screen-ray-direction 5 3)))
+
+(ray-vs-shape
+	sample-ray
+	sample-sphere)
+
