@@ -6,23 +6,34 @@
 	(list *screen-width* *screen-height*)
 	:initial-element (list 0 0 0)))
 
+(defun get-pixel (x y)
+	(aref pixels x y))
+
+(defun set-pixel (x y r g b)
+	(setf (aref pixels x y) (list r g b)))
+
+(defun i->xy (ix)
+	(cons (mod ix *screen-width*) (/ ix *screen-width*)))
+
 (defun write-image ()
   	(print "Writing pixels ...")
   	(write-line "P3" img-stream)
 	(write-line (format nil "~a ~a" *screen-width* *screen-height*) img-stream)
 	(write-line "255" img-stream)
 	(dotimes (ix (* *screen-width* *screen-height*))
-		(write-line (format nil "~a" 123) img-stream))
+	  	(let*	((xy-pair (i->xy ix))
+		       	(x (car xy-pair))
+			(y (cdr xy-pair))
+			(px (get-pixel x y)))
+
+			(write-line
+				(format nil "~a" 1)
+				img-stream)))
+
 	(print "Done."))
 
 (defun close-stream ()
 	(close img-stream))
-
-(defun get-pixel (x y)
-	(aref pixels x y))
-
-(defun set-pixel (x y r g b)
-	(setf (aref pixels x y) (list r g b)))
 
 (defclass vec3d ()
 	((x	:initform 0
