@@ -1,6 +1,28 @@
-(defparameter *screen-width* 1000)
-(defparameter *screen-height* 700)
-(defparameter *focal-length* 2)
+(defvar *screen-width* 1000)
+(defvar *screen-height* 700)
+(defvar *focal-length* 2)
+(defvar img-stream (open "output.ppm" :direction :output :if-exists :supersede))
+(defvar pixels (make-array
+	(list *screen-width* *screen-height*)
+	:initial-element (list 0 0 0)))
+
+(defun write-image ()
+  	(print "Writing pixels ...")
+  	(write-line "P3" img-stream)
+	(write-line (format nil "~a ~a" *screen-width* *screen-height*) img-stream)
+	(write-line "255" img-stream)
+	(dotimes (ix (* *screen-width* *screen-height*))
+		(write-line (format nil "~a" 123) img-stream))
+	(print "Done."))
+
+(defun close-stream ()
+	(close img-stream))
+
+(defun get-pixel (x y)
+	(aref pixels x y))
+
+(defun set-pixel (x y r g b)
+	(setf (aref pixels x y) (list r g b)))
 
 (defclass vec3d ()
 	((x	:initform 0
@@ -71,3 +93,6 @@
 	sample-ray
 	sample-sphere)
 
+(write-image)
+
+(close-stream)
