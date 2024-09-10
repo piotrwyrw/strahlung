@@ -1,5 +1,5 @@
-(defvar *screen-width* 1000)
-(defvar *screen-height* 700)
+(defvar *screen-width* 300)
+(defvar *screen-height* 300)
 (defvar *focal-length* 2)
 (defvar img-stream (open "output.ppm" :direction :output :if-exists :supersede))
 (defvar pixels (make-array
@@ -21,8 +21,16 @@
 	(write-line (format nil "~a ~a" *screen-width* *screen-height*) img-stream)
 	(write-line "255" img-stream)
 	(dotimes (ix (* *screen-width* *screen-height*))
-	  	(let* ((xy-pair (i->xy ix)) (x (nth 0 xy-pair)) (y (nth 1 xy-pair)) (px (get-pixel x y)))
-			(write-line (format nil "~a ~a ~a" (nth 0 px) (nth 1 px) (nth 2 px)) img-stream)))
+	  	(let*	((xy-pair (i->xy ix))
+			(x (nth 0 xy-pair))
+			(y (nth 1 xy-pair))
+			(px (get-pixel x y)))
+
+			(write-line
+				(format nil "~a ~a ~a"
+					(nth 0 px)
+					(nth 1 px)
+					(nth 2 px)) img-stream)))
 
 	(print "Done."))
 
@@ -55,17 +63,22 @@
 				(setf (vec-z vec) (/ (vec-z vec) magnitude))
 				vec))))
 
+(defclass ray ()
+	((origin	:initarg :origin
+			:accessor ray-origin)
+	 (direction	:initarg :direction
+			:accessor ray-direction)))
+
 (defun screen-ray-direction (screen-x screen-y)
 	(make-instance 'vec3d
 		:x (+ -1.0 (* (/ 2.0 *screen-width*) screen-x))
 		:y (- 1.0 (* (/ 2.0 *screen-height*) screen-y))
 		:z *focal-length*))
 
-(defclass ray ()
-	((origin	:initarg :origin
-			:accessor ray-origin)
-	 (direction	:initarg :direction
-			:accessor ray-direction)))
+(defun screen-ray (screen-x screen-y)
+	(make-instance 'ray
+		:origin (make-instance 'vec3d :x 0 :y 0 :z 0)
+		:direction (vector-normalize (screen-ray-direction screen-x screen-y))))
 
 (defclass shape () ())
 
@@ -91,12 +104,16 @@
 (defmethod ray-vs-shape ((ray ray) (shape sphere))
 	(print "Hello, World!")) ;; TODO Implement the intersection equation here
 
-(defvar sample-sphere (make-instance 'sphere :center (screen-ray-direction 3 2) :radius 2.3))
-(defvar sample-ray (make-instance 'ray :origin (screen-ray-direction 3 2) :direction (screen-ray-direction 5 3)))
+(defun trace-all-rays ()
+	(dotimes (x *screen-width*)
+		(dotimes (y *screen-height*)
+			(let* ((ray (screen-ray x y)) (direction (ray-direction ray)))
+				(set-pixel x y
+					(+ 128 (floor (* 128 (vec-x direction))))
+					(+ 128 (floor (* 128 (vec-y direction))))
+					(+ 128 (floor (* 128 (vec-z direction)))))))))
 
-(ray-vs-shape
-	sample-ray
-	sample-sphere)
+(trace-all-rays)
 
 (write-image)
 
