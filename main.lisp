@@ -111,7 +111,7 @@
 			:documentation "The distance along the ray to the intersection point")))
 
 (defmethod ray-vs-shape ((ray ray) (shape sphere))
-	(format t "Hello, World!~&")) ;; TODO Implement the intersection equation here
+	nil)
 
 (defun trace-all-rays ()
 	(dotimes (x *screen-width*)
@@ -131,13 +131,13 @@
 (defun call-shader (id _intersection)
 	(funcall (retrieve-shader-lambda id) _intersection))
 
-(register-shader 'binary-shader
-	(lambda (_intersection)
-		(if _intersection
-			(list 255 255 255)
-		(list 0 0 0))))
+(defmacro defshader (name interId _lambda)
+	(list 'register-shader name (list 'lambda (list interId) _lambda)))
 
-(call-shader 'binary-shader nil)
+(defshader 'hello-world-shader inter
+	(format t "~a~&" inter))
+
+(call-shader 'hello-world-shader "Hello, World!")
 
 (format t "Rendering ...~&")
 (trace-all-rays)
