@@ -132,7 +132,7 @@
 	(funcall (retrieve-shader-lambda id) _intersection))
 
 (defmacro defshader (name interId _lambda)
-	(list 'register-shader name (list 'lambda (list interId) _lambda)))
+	`(register-shader ,name (lambda (,interId) ,_lambda)))
 
 (defshader 'hello-world-shader inter
 	(format t "~a~&" inter))
