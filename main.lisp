@@ -13,7 +13,7 @@
 	(setf (aref pixels x y) (list r g b)))
 
 (defun i->xy (ix)
-	(cons (mod ix *screen-width*) (/ ix *screen-width*)))
+	(list (mod ix *screen-width*) (floor ix *screen-width*)))
 
 (defun write-image ()
   	(print "Writing pixels ...")
@@ -21,14 +21,8 @@
 	(write-line (format nil "~a ~a" *screen-width* *screen-height*) img-stream)
 	(write-line "255" img-stream)
 	(dotimes (ix (* *screen-width* *screen-height*))
-	  	(let*	((xy-pair (i->xy ix))
-		       	(x (car xy-pair))
-			(y (cdr xy-pair))
-			(px (get-pixel x y)))
-
-			(write-line
-				(format nil "~a" 1)
-				img-stream)))
+	  	(let* ((xy-pair (i->xy ix)) (x (nth 0 xy-pair)) (y (nth 1 xy-pair)) (px (get-pixel x y)))
+			(write-line (format nil "~a ~a ~a" (nth 0 px) (nth 1 px) (nth 2 px)) img-stream)))
 
 	(print "Done."))
 
