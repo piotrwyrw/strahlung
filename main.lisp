@@ -113,6 +113,32 @@
 			:accessor intersect-distance
 			:documentation "The distance along the ray to the intersection point")))
 
+(defmacro square (v)
+	"Squares a given expression"
+	`(* ,v ,v))
+
+(defun solve-quadratic (a b c)
+	(let* (	(discriminant (- (square b) (* 4 a c))) (first-solution 0) (second-solution 0))
+		(if (< discriminant 0)
+			123
+		(progn 
+		(if (>= discriminant 0)
+			(setf first-solution
+			      (/ (+	(* -1 b)
+					(sqrt
+						(-	(square b)
+							(* 4 a c))))
+				 (* 2 a)))
+			nil
+		(if (> discriminant 0)
+			(setf second-solution
+			      (/ (-	(* -1 b)
+					(sqrt
+						(-	(square b)
+							(* 4 a c))))))
+			nil))
+		(list first-solution second-solution)))))
+
 (defmethod ray-vs-shape ((ray ray) (shape sphere))
   	"Find the intersection between a ray and a shape. Returns an instance of an intersection"
 	(let* (	(O (ray-origin ray))
@@ -123,17 +149,36 @@
 		(Oy (vec-y O))
 		(Oz (vec-z O))
 
-		(Cz (vec-z C))
+		(Cx (vec-z C))
 		(Cy (vec-y C))
 		(Cz (vec-z C))
 
-		(Ox (vec-x O))
-		(Oy (vec-y O))
-		(Oz (vec-z O))
+		(Dx (vec-x D))
+		(Dy (vec-y D))
+		(Dz (vec-z D))
 
-		(r (sphere-radius shape)))
+		(r (sphere-radius shape))
 
-		(print "Hello!")))
+		(a (+ (square Dx) (square Dy) (square Dz)))
+
+		(b (+	(* -2 Cx Dx)
+			(* -2 Cy Dy)
+			(* -2 Cz Dz)
+			(* 2 Dx Ox)
+			(* 2 Dy Oy)
+			(* 2 Dz Oz)))
+
+	  	(c (+	(square Oz)
+			(* -2 Cz Oz)
+			(square Cx)
+			(* -2 Cx Ox)
+			(square Cy)
+			(* -2 Cy Oy)
+			(square Cz)
+			(square Ox)
+			(square Oy))))
+
+		(format t "~a~&" a)))
 
 (defun trace-all-rays ()
 	(dotimes (x *screen-width*)
@@ -164,6 +209,8 @@
 (defvar sample-sphere (make-instance 'sphere :center (screen-ray-direction 3 5) :radius 3))
 (defvar sample-ray (screen-ray 6 4))
 (ray-vs-shape sample-ray sample-sphere)
+
+(format t "Solution: ~a~&" (solve-quadratic 493 55 2))
 
 (format t "Rendering ...~&")
 (trace-all-rays)
