@@ -2,9 +2,9 @@
 ;; S T R A H L U N G
 ;;
 
-(defvar *screen-width* 300)
-(defvar *screen-height* 300)
-(defvar *focal-length* 1.0)
+(defvar *screen-width* 1000)
+(defvar *screen-height* 1000)
+(defvar *focal-length* 3.0)
 
 (defvar *img-stream* (open "output.ppm" :direction :output :if-exists :supersede))
 (defvar *pixels* (make-array
@@ -88,6 +88,13 @@
 			:x (+ (vec-x vec) (vec-x another))
 			:y (+ (vec-y vec) (vec-y another))
 			:z (+ (vec-z vec) (vec-z another))))
+
+(defun vector-color (vec)
+	(let ((norm (vector-normalize vec)))
+		(list
+			(floor (+ 128 (* 128 (vec-x norm))))
+			(floor (+ 128 (* 128 (vec-y norm))))
+			(floor (+ 128 (* 128 (vec-z norm)))))))
 
 (defclass ray ()
 	((origin	:initarg :origin
@@ -210,8 +217,10 @@
 (defmacro defshader (name interId _lambda)
 	`(register-shader ,name (lambda (,interId) ,_lambda)))
 
-(defshader 'binary-shader inter
-	(list 255 50 50))
+(defshader 'direction-shader inter
+	(vector-color
+		(ray-direction
+			(intersect-ray inter))))
 
 (defvar sample-sphere (make-instance 'sphere
 			:center (make-instance 'vec3d
@@ -219,7 +228,7 @@
 					:y 0.0
 					:z 20.0)
 			:radius 5.0
-			:shader 'binary-shader))
+			:shader 'direction-shader))
 
 (defun trace-all-rays ()
 	(dotimes (x *screen-width*)
