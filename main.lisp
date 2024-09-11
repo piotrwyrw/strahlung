@@ -117,27 +117,14 @@
 	"Squares a given expression"
 	`(* ,v ,v))
 
-(defun solve-quadratic (a b c)
-	(let* (	(discriminant (- (square b) (* 4 a c))) (first-solution 0) (second-solution 0))
-		(if (< discriminant 0)
-			123
-		(progn 
-		(if (>= discriminant 0)
-			(setf first-solution
-			      (/ (+	(* -1 b)
-					(sqrt
-						(-	(square b)
-							(* 4 a c))))
-				 (* 2 a)))
-			nil
-		(if (> discriminant 0)
-			(setf second-solution
-			      (/ (-	(* -1 b)
-					(sqrt
-						(-	(square b)
-							(* 4 a c))))))
-			nil))
-		(list first-solution second-solution)))))
+(defun quadratic-solve (a b c)
+	"Solve the quadratic equation and return a list of results or NIL"
+	(let* ((quad-disc (- (square b) (* 4 a c))) (result nil) (quad-denominator (* 2 a)))
+	  	(cond	((>=	quad-disc 0) (setf result	(append result
+								(list (/ (+ (* -1 b) (sqrt quad-disc)) quad-denominator))))))
+		(cond	((>	quad-disc 0) (setf result	(append result
+								(list (/ (- (* -1 b) (sqrt quad-disc)) quad-denominator))))))
+		result))
 
 (defmethod ray-vs-shape ((ray ray) (shape sphere))
   	"Find the intersection between a ray and a shape. Returns an instance of an intersection"
@@ -210,7 +197,7 @@
 (defvar sample-ray (screen-ray 6 4))
 (ray-vs-shape sample-ray sample-sphere)
 
-(format t "Solution: ~a~&" (solve-quadratic 493 55 2))
+(format t "Solution: ~a~&" (quadratic-solve 6 11 -35))
 
 (format t "Rendering ...~&")
 (trace-all-rays)
