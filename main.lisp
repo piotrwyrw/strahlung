@@ -13,6 +13,8 @@
 
 (defvar *shading-functions* (make-hash-table))
 
+(defconstant *epsilon* 0.0000001)
+
 ;; Image utilities
 
 (defun get-pixel (x y)
@@ -119,11 +121,15 @@
 
 (defun quadratic-solve (a b c)
 	"Solve the quadratic equation and return a list of results or NIL"
-	(let* ((quad-disc (- (square b) (* 4 a c))) (result nil) (quad-denominator (* 2 a)))
-	  	(cond	((>=	quad-disc 0) (setf result	(append result
-								(list (/ (+ (* -1 b) (sqrt quad-disc)) quad-denominator))))))
-		(cond	((>	quad-disc 0) (setf result	(append result
-								(list (/ (- (* -1 b) (sqrt quad-disc)) quad-denominator))))))
+	(let* ((quad-disc (- (square b) (* 4 a c))) (result nil) (quad-denominator (* 2 a)) (tmp-res 0))
+	  	(cond	((>=	quad-disc 0) (progn
+						(setf tmp-res (/ (+ (* -1 b) (sqrt quad-disc)) quad-denominator))
+						(if (> tmp-res *epsilon*)
+							(setf result (append result (list tmp-res)))))))
+		(cond	((>	quad-disc 0) (progn
+						(setf tmp-res (/ (- (* -1 b) (sqrt quad-disc)) quad-denominator))
+						(if (> tmp-res *epsilon*)
+							(setf result (append result (list tmp-res)))))))
 		result))
 
 (defmethod ray-vs-shape ((ray ray) (shape sphere))
