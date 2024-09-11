@@ -13,7 +13,7 @@
 
 (defvar *shading-functions* (make-hash-table))
 
-(defconstant *epsilon* 0.0000001)
+(defconstant *epsilon* 0)
 
 ;; Image utilities
 
@@ -71,11 +71,11 @@
 (defun vector-normalize (vec)
 	(let ((magnitude (vector-magnitude vec)))
 	  	(if (/= magnitude 0.0)
-			(progn
-				(setf (vec-x vec) (/ (vec-x vec) magnitude))
-				(setf (vec-y vec) (/ (vec-y vec) magnitude))
-				(setf (vec-z vec) (/ (vec-z vec) magnitude))
-				vec))))
+			(make-instance 'vec3d
+				:x (/ (vec-x vec) magnitude)
+				:y (/ (vec-y vec) magnitude)
+				:z (/ (vec-z vec) magnitude))
+		vec)))
 
 (defun vector-mul (vec d)
 	(make-instance 'vec3d
@@ -96,15 +96,15 @@
 			:accessor ray-direction)))
 
 (defun screen-ray-direction (screen-x screen-y)
-	(make-instance 'vec3d
+	(vector-normalize (make-instance 'vec3d
 		:x (+ -1.0 (* (/ 2.0 *screen-width*) screen-x))
 		:y (- 1.0 (* (/ 2.0 *screen-height*) screen-y))
-		:z *focal-length*))
+		:z *focal-length*)))
 
 (defun screen-ray (screen-x screen-y)
 	(make-instance 'ray
 		:origin (make-instance 'vec3d :x 0 :y 0 :z 0)
-		:direction (vector-normalize (screen-ray-direction screen-x screen-y))))
+		:direction (screen-ray-direction screen-x screen-y)))
 
 (defun point-along-ray (ray distance)
 	(vector-add
@@ -159,7 +159,7 @@
 		(Oy (vec-y O))
 		(Oz (vec-z O))
 
-		(Cx (vec-z C))
+		(Cx (vec-x C))
 		(Cy (vec-y C))
 		(Cz (vec-z C))
 
@@ -186,20 +186,22 @@
 			(* -2 Cy Oy)
 			(square Cz)
 			(square Ox)
-			(square Oy)))
+			(square Oy)
+			(* -1 (square r))))
 
 		(dst (quadratic-solve a b c)))
 
 		(if dst
-			(make-instance 'intersect :shape shape :ray ray :point (point-along-ray ray (reduce #'min dst)) :distance dst)
+		  	(progn 
+				(make-instance 'intersect :shape shape :ray ray :point (point-along-ray ray (reduce #'min dst)) :distance dst))
 		nil)))
 
 (defvar sample-sphere (make-instance 'sphere
 			:center (make-instance 'vec3d
 					:x 0.0
 					:y 0.0
-					:z -2.0)
-			:radius 0.5))
+					:z 20.0)
+			:radius 5.0))
 
 (defun trace-all-rays ()
 	(dotimes (x *screen-width*)
