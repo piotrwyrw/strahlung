@@ -20,8 +20,8 @@
 (defun get-pixel (x y)
 	(aref *pixels* x y))
 
-(defun set-pixel (x y r g b)
-	(setf (aref *pixels* x y) (list r g b)))
+(defun set-pixel (x y rgb-list)
+	(setf (aref *pixels* x y) rgb-list))
 
 (defun i->xy (ix)
 	(list
@@ -117,7 +117,9 @@
 	((center	:initarg :center
 			:accessor sphere-center)
 	 (radius	:initarg :radius
-			:accessor sphere-radius)))
+			:accessor sphere-radius)
+	 (shader	:initarg :shader
+			:accessor sphere-shader)))
 
 (defgeneric ray-vs-shape (ray shape))
 
@@ -196,21 +198,6 @@
 				(make-instance 'intersect :shape shape :ray ray :point (point-along-ray ray (reduce #'min dst)) :distance dst))
 		nil)))
 
-(defvar sample-sphere (make-instance 'sphere
-			:center (make-instance 'vec3d
-					:x 0.0
-					:y 0.0
-					:z 20.0)
-			:radius 5.0))
-
-(defun trace-all-rays ()
-	(dotimes (x *screen-width*)
-		(dotimes (y *screen-height*)
-			(let* ((ray (screen-ray x y)) (direction (ray-direction ray)) (inter (ray-vs-shape ray sample-sphere)))
-					(if inter
-						(set-pixel x y 255 255 255)
-					(set-pixel x y 0 0 0))))))
-
 (defun register-shader (id fun)
 	(setf (gethash id *shading-functions*) fun))
 
@@ -223,10 +210,24 @@
 (defmacro defshader (name interId _lambda)
 	`(register-shader ,name (lambda (,interId) ,_lambda)))
 
-(defshader 'hello-world-shader inter
-	(format t "~a~&" inter))
+(defshader 'binary-shader inter
+	(list 255 50 50))
 
-(call-shader 'hello-world-shader "Hello, World!")
+(defvar sample-sphere (make-instance 'sphere
+			:center (make-instance 'vec3d
+					:x 0.0
+					:y 0.0
+					:z 20.0)
+			:radius 5.0
+			:shader 'binary-shader))
+
+(defun trace-all-rays ()
+	(dotimes (x *screen-width*)
+		(dotimes (y *screen-height*)
+			(let* ((ray (screen-ray x y)) (direction (ray-direction ray)) (inter (ray-vs-shape ray sample-sphere)))
+					(if inter
+						(set-pixel x y (call-shader (sphere-shader sample-sphere) inter))
+					(set-pixel x y (list 0 0 0)))))))
 
 (format t "Rendering ...~&")
 (trace-all-rays)
