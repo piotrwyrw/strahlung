@@ -1,3 +1,7 @@
+;;
+;; S T R A H L U N G
+;;
+
 (defvar *screen-width* 300)
 (defvar *screen-height* 300)
 (defvar *focal-length* 0.1)
@@ -8,7 +12,6 @@
 	:initial-element (list 0 0 0)))
 
 (defvar *shading-functions* (make-hash-table))
-
 
 ;; Image utilities
 
@@ -111,7 +114,26 @@
 			:documentation "The distance along the ray to the intersection point")))
 
 (defmethod ray-vs-shape ((ray ray) (shape sphere))
-	nil)
+  	"Find the intersection between a ray and a shape. Returns an instance of an intersection"
+	(let* (	(O (ray-origin ray))
+	       	(D (ray-direction ray))
+		(C (sphere-center shape))
+
+		(Ox (vec-x O))
+		(Oy (vec-y O))
+		(Oz (vec-z O))
+
+		(Cz (vec-z C))
+		(Cy (vec-y C))
+		(Cz (vec-z C))
+
+		(Ox (vec-x O))
+		(Oy (vec-y O))
+		(Oz (vec-z O))
+
+		(r (sphere-radius shape)))
+
+		(print "Hello!")))
 
 (defun trace-all-rays ()
 	(dotimes (x *screen-width*)
@@ -138,6 +160,10 @@
 	(format t "~a~&" inter))
 
 (call-shader 'hello-world-shader "Hello, World!")
+
+(defvar sample-sphere (make-instance 'sphere :center (screen-ray-direction 3 5) :radius 3))
+(defvar sample-ray (screen-ray 6 4))
+(ray-vs-shape sample-ray sample-sphere)
 
 (format t "Rendering ...~&")
 (trace-all-rays)
