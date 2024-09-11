@@ -4,7 +4,7 @@
 
 (defvar *screen-width* 300)
 (defvar *screen-height* 300)
-(defvar *focal-length* 0.1)
+(defvar *focal-length* 1.0)
 
 (defvar *img-stream* (open "output.ppm" :direction :output :if-exists :supersede))
 (defvar *pixels* (make-array
@@ -62,13 +62,13 @@
 		:initarg :z
 		:accessor vec-z)))
 
-(defmethod vector-magnitude ((vec vec3d))
+(defun vector-magnitude (vec)
 	(sqrt (+
 		(expt (vec-x vec) 2)
 		(expt (vec-y vec) 2)
 		(expt (vec-z vec) 2))))
 
-(defmethod vector-normalize ((vec vec3d))
+(defun vector-normalize (vec)
 	(let ((magnitude (vector-magnitude vec)))
 	  	(if (/= magnitude 0.0)
 			(progn
@@ -76,6 +76,18 @@
 				(setf (vec-y vec) (/ (vec-y vec) magnitude))
 				(setf (vec-z vec) (/ (vec-z vec) magnitude))
 				vec))))
+
+(defun vector-mul (vec d)
+	(make-instance 'vec3d
+			:x (* (vec-x vec) d)
+			:y (* (vec-y vec) d)
+			:z (* (vec-z vec) d)))
+
+(defun vector-add (vec another)
+	(make-instance 'vec3d
+			:x (+ (vec-x vec) (vec-x another))
+			:y (+ (vec-y vec) (vec-y another))
+			:z (+ (vec-z vec) (vec-z another))))
 
 (defclass ray ()
 	((origin	:initarg :origin
@@ -93,6 +105,11 @@
 	(make-instance 'ray
 		:origin (make-instance 'vec3d :x 0 :y 0 :z 0)
 		:direction (vector-normalize (screen-ray-direction screen-x screen-y))))
+
+(defun point-along-ray (ray distance)
+	(vector-add
+		(vector-mul (ray-direction ray) distance)
+		(ray-origin ray)))
 
 (defclass shape () ())
 
@@ -169,18 +186,28 @@
 			(* -2 Cy Oy)
 			(square Cz)
 			(square Ox)
-			(square Oy))))
+			(square Oy)))
 
-		(format t "~a~&" a)))
+		(dst (quadratic-solve a b c)))
+
+		(if dst
+			(make-instance 'intersect :shape shape :ray ray :point (point-along-ray ray (reduce #'min dst)) :distance dst)
+		nil)))
+
+(defvar sample-sphere (make-instance 'sphere
+			:center (make-instance 'vec3d
+					:x 0.0
+					:y 0.0
+					:z -2.0)
+			:radius 0.5))
 
 (defun trace-all-rays ()
 	(dotimes (x *screen-width*)
 		(dotimes (y *screen-height*)
-			(let* ((ray (screen-ray x y)) (direction (ray-direction ray)))
-				(set-pixel x y
-					(+ 128 (floor (* 128 (vec-x direction))))
-					(+ 128 (floor (* 128 (vec-y direction))))
-					(+ 128 (floor (* 128 (vec-z direction)))))))))
+			(let* ((ray (screen-ray x y)) (direction (ray-direction ray)) (inter (ray-vs-shape ray sample-sphere)))
+					(if inter
+						(set-pixel x y 255 255 255)
+					(set-pixel x y 0 0 0))))))
 
 (defun register-shader (id fun)
 	(setf (gethash id *shading-functions*) fun))
@@ -198,12 +225,6 @@
 	(format t "~a~&" inter))
 
 (call-shader 'hello-world-shader "Hello, World!")
-
-(defvar sample-sphere (make-instance 'sphere :center (screen-ray-direction 3 5) :radius 3))
-(defvar sample-ray (screen-ray 6 4))
-(ray-vs-shape sample-ray sample-sphere)
-
-(format t "Solution: ~a~&" (quadratic-solve 6 11 -35))
 
 (format t "Rendering ...~&")
 (trace-all-rays)
