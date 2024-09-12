@@ -2,6 +2,11 @@
 ;; S T R A H L U N G
 ;;
 
+(defpackage :strahlung
+	(:use :cl))
+
+(in-package :strahlung)
+
 (defvar *screen-width* 500)
 (defvar *screen-height* 500)
 (defvar *focal-length* 3.0)
@@ -20,7 +25,7 @@
 (defun add-shape (shape)
 	(setf *shapes* (append *shapes* shape)))
 
-(defconstant *epsilon* 0.000001)
+(defvar *epsilon* 0.000001)
 
 ;; Image utilities
 
