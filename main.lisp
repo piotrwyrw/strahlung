@@ -22,8 +22,8 @@
 ;; This is used to add a bit of noise to the scene
 (defvar *ray-variance* 0.0025)
 
-(defun add-shape (shape)
-	(setf *shapes* (append *shapes* shape)))
+(defun add-shapes (&rest shapes)
+	(setf *shapes* (nconc *shapes* shapes)))
 
 (defvar *epsilon* 0.000001)
 
@@ -159,15 +159,15 @@
 		(vector-mul (ray-direction ray) distance)
 		(ray-origin ray)))
 
-(defclass shape () ())
+(defclass shape ()
+	((shader	:initarg :shader
+			:accessor shape-shader)))
 
 (defclass sphere (shape)
 	((center	:initarg :center
 			:accessor sphere-center)
 	 (radius	:initarg :radius
-			:accessor sphere-radius)
-	 (shader	:initarg :shader
-			:accessor sphere-shader)))
+			:accessor sphere-radius)))
 
 (defgeneric ray-vs-shape (ray shape))
 (defgeneric shape-normal (shape point))
@@ -243,10 +243,10 @@
 		(dst (quadratic-solve a b c)))
 
 		(if dst
-		  	(progn 
+		  	(progn
+			  	(setf dst (reduce #'min dst))
 				(make-instance 'intersect :shape shape :ray ray
-					:point (point-along-ray ray
-						(reduce #'min dst))
+					:point (point-along-ray ray dst)
 					:distance dst))
 		nil)))
 
@@ -274,24 +274,55 @@
 			(intersect-shape inter)
 			(intersect-point inter))))
 
-(defvar sample-sphere (make-instance 'sphere
-			:center (make-instance 'vec3d
-					:x 0.0
-					:y 0.0
-					:z 20.0)
-			:radius 5.0
-			:shader 'normal-shader))
-
 (defun trace-all-rays ()
 	(dotimes (x *screen-width*)
 		(dotimes (y *screen-height*)
-			(let* ((ray (screen-ray x y)) (inter (ray-vs-shape ray sample-sphere)))
-					(if inter
-						(set-pixel x y (call-shader (sphere-shader sample-sphere) inter))
-					(set-pixel x y (list 0 0 0)))))))
+			(let* ((ray (screen-ray x y)) (intersections '()) (first-inter nil))
+			  	(dolist (shape *shapes*)
+				  	(let ((inter (ray-vs-shape ray shape)))
+						(when inter
+						  	(progn
+								(setf intersections
+								(setf intersections
+									(append intersections
+										(list inter)))))
+					)))
+				(when intersections (progn
+					(setf first-inter
+						(reduce (lambda (left right) 
+							(if (< (intersect-distance left) (intersect-distance right))
+								left
+								right))
+							intersections))
+					(set-pixel x y
+						(call-shader
+							(shape-shader
+								(intersect-shape first-inter))
+							first-inter))))))))
+
+;; Scene Setup
+(defun setup-scene()
+	(add-shapes
+		(make-instance 'sphere
+			:center (make-instance 'vec3d
+				:x 0.0
+				:y 0.0
+				:z 30.0)
+			:radius 5.0
+			:shader 'normal-shader)
+
+		(make-instance 'sphere
+			:center (make-instance 'vec3d
+				:x -2.0
+				:y 0.0
+				:z 10.0)
+			:radius 0.5
+			:shader 'normal-shader)))
+
 
 (defun main()
 	(format t "Rendering ...~&")
+	(setup-scene)
 	(trace-all-rays)
 	(write-image)
 	(sb-ext:quit))
