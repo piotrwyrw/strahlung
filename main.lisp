@@ -2,18 +2,25 @@
 ;; S T R A H L U N G
 ;;
 
-(defvar *screen-width* 1000)
-(defvar *screen-height* 1000)
+(defvar *screen-width* 500)
+(defvar *screen-height* 500)
 (defvar *focal-length* 3.0)
 
-(defvar *img-stream* (open "output.ppm" :direction :output :if-exists :supersede))
 (defvar *pixels* (make-array
 	(list *screen-width* *screen-height*)
 	:initial-element (list 0 0 0)))
 
 (defvar *shading-functions* (make-hash-table))
 
-(defconstant *epsilon* 0)
+(defvar *shapes* nil)
+
+;; This is used to add a bit of noise to the scene
+(defvar *ray-variance* 0.0025)
+
+(defun add-shape (shape)
+	(setf *shapes* (append *shapes* shape)))
+
+(defconstant *epsilon* 0.000001)
 
 ;; Image utilities
 
@@ -23,31 +30,40 @@
 (defun set-pixel (x y rgb-list)
 	(setf (aref *pixels* x y) rgb-list))
 
+(defun rgb-average (rgb-1 rgb-2)
+	(list
+		(floor (+ (nth 0 rgb-1) (nth 0 rgb-2) 2))
+		(floor (+ (nth 1 rgb-1) (nth 1 rgb-2) 2))
+		(floor (+ (nth 2 rgb-1) (nth 2 rgb-2) 2))))
+
 (defun i->xy (ix)
 	(list
 		(mod ix *screen-width*)
 		(floor ix *screen-width*)))
 
+(defun close-stream (str)
+	(close str))
+
 (defun write-image ()
-  	(format t "Writing pixels ...~&")
-  	(write-line "P3" *img-stream*)
-	(write-line (format nil "~a ~a" *screen-width* *screen-height*) *img-stream*)
-	(write-line "255" *img-stream*)
-	(dotimes (ix (* *screen-width* *screen-height*))
-	  	(let*	((xy-pair (i->xy ix))
-			(x (nth 0 xy-pair))
-			(y (nth 1 xy-pair))
-			(px (get-pixel x y)))
-			(write-line
-				(format nil "~a ~a ~a"
-					(nth 0 px)
-					(nth 1 px)
-					(nth 2 px)) *img-stream*)))
+  	(format t "Preparing file for writing ...~&")
+	(let ((img-stream (open "output.ppm" :direction :output :if-exists :supersede)))
+  		(format t "Writing pixels ...~&")
+  		(write-line "P3" img-stream)
+		(write-line (format nil "~a ~a" *screen-width* *screen-height*) img-stream)
+		(write-line "255" img-stream)
+		(dotimes (ix (* *screen-width* *screen-height*))
+	  		(let*	((xy-pair (i->xy ix))
+				(x (nth 0 xy-pair))
+				(y (nth 1 xy-pair))
+				(px (get-pixel x y)))
+				(write-line
+					(format nil "~a ~a ~a"
+						(nth 0 px)
+						(nth 1 px)
+						(nth 2 px)) img-stream)))
+		(format t "Closing file ...~&")
+		(close-stream img-stream))
 	(format t "Done.~&"))
-
-(defun close-stream ()
-	(close *img-stream*))
-
 
 ;; Linear Algebra
 
@@ -89,6 +105,14 @@
 			:y (+ (vec-y vec) (vec-y another))
 			:z (+ (vec-z vec) (vec-z another))))
 
+(defun vector-sub (vec another)
+	(make-instance 'vec3d
+			:x (- (vec-x vec) (vec-x another))
+			:y (- (vec-y vec) (vec-y another))
+			:z (- (vec-z vec) (vec-z another))))
+
+
+
 (defun vector-color (vec)
 	(let ((norm (vector-normalize vec)))
 		(list
@@ -102,11 +126,23 @@
 	 (direction	:initarg :direction
 			:accessor ray-direction)))
 
+(defun variance-vector ()
+	(make-instance 'vec3d
+		:x (random *ray-variance*)
+		:y (random *ray-variance*)
+		:z 0)) ;; The ray variance should have no effect on the Z axis
+
+(defun varied-vector (original)
+	(vector-normalize
+		(vector-add original
+			(variance-vector))))
+
 (defun screen-ray-direction (screen-x screen-y)
-	(vector-normalize (make-instance 'vec3d
-		:x (+ -1.0 (* (/ 2.0 *screen-width*) screen-x))
-		:y (- 1.0 (* (/ 2.0 *screen-height*) screen-y))
-		:z *focal-length*)))
+	(varied-vector
+		(make-instance 'vec3d
+			:x (+ -1.0 (* (/ 2.0 *screen-width*) screen-x))
+			:y (- 1.0 (* (/ 2.0 *screen-height*) screen-y))
+			:z *focal-length*)))
 
 (defun screen-ray (screen-x screen-y)
 	(make-instance 'ray
@@ -129,6 +165,7 @@
 			:accessor sphere-shader)))
 
 (defgeneric ray-vs-shape (ray shape))
+(defgeneric shape-normal (shape point))
 
 (defclass intersect ()
 	((shape		:initarg :shape
@@ -202,8 +239,17 @@
 
 		(if dst
 		  	(progn 
-				(make-instance 'intersect :shape shape :ray ray :point (point-along-ray ray (reduce #'min dst)) :distance dst))
+				(make-instance 'intersect :shape shape :ray ray
+					:point (point-along-ray ray
+						(reduce #'min dst))
+					:distance dst))
 		nil)))
+
+(defmethod shape-normal ((shape sphere) (point vec3d))
+	(vector-normalize
+	  	(vector-sub
+			(sphere-center shape)
+			point)))
 
 (defun register-shader (id fun)
 	(setf (gethash id *shading-functions*) fun))
@@ -217,10 +263,11 @@
 (defmacro defshader (name interId _lambda)
 	`(register-shader ,name (lambda (,interId) ,_lambda)))
 
-(defshader 'direction-shader inter
+(defshader 'normal-shader inter
 	(vector-color
-		(ray-direction
-			(intersect-ray inter))))
+		(shape-normal
+			(intersect-shape inter)
+			(intersect-point inter))))
 
 (defvar sample-sphere (make-instance 'sphere
 			:center (make-instance 'vec3d
@@ -228,17 +275,18 @@
 					:y 0.0
 					:z 20.0)
 			:radius 5.0
-			:shader 'direction-shader))
+			:shader 'normal-shader))
 
 (defun trace-all-rays ()
 	(dotimes (x *screen-width*)
 		(dotimes (y *screen-height*)
-			(let* ((ray (screen-ray x y)) (direction (ray-direction ray)) (inter (ray-vs-shape ray sample-sphere)))
+			(let* ((ray (screen-ray x y)) (inter (ray-vs-shape ray sample-sphere)))
 					(if inter
 						(set-pixel x y (call-shader (sphere-shader sample-sphere) inter))
 					(set-pixel x y (list 0 0 0)))))))
 
-(format t "Rendering ...~&")
-(trace-all-rays)
-(write-image)
-(close-stream)
+(defun main()
+	(format t "Rendering ...~&")
+	(trace-all-rays)
+	(write-image)
+	(sb-ext:quit))
