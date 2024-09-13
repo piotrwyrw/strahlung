@@ -288,29 +288,35 @@
 (defshader 'default-shader inter params
 	(gethash 'color params))
 
+(defun trace-ray (ray)
+	(let* ((intersections '()) (first-inter nil) (px-color nil))
+		(dolist (shape *shapes*)
+			(let ((inter (ray-vs-shape ray shape)))
+				(when inter
+					(setf intersections
+						(append intersections
+						(list inter))))))
+		(when intersections (progn
+			(setf first-inter
+				(reduce (lambda (left right) 
+					(if (< (intersect-distance left) (intersect-distance right))
+						left
+						right))
+					intersections))
+			(setf px-color (call-shader
+				(shape-shader
+					(intersect-shape first-inter))
+				first-inter))))
+		(if px-color
+			px-color
+		(list 0 0 0))))
+
 (defun trace-all-rays ()
 	(dotimes (x *screen-width*)
 		(dotimes (y *screen-height*)
-			(let* ((ray (screen-ray x y)) (intersections '()) (first-inter nil))
-			  	(dolist (shape *shapes*)
-				  	(let ((inter (ray-vs-shape ray shape)))
-						(when inter
-							(setf intersections
-								(append intersections
-									(list inter)))
-					)))
-				(when intersections (progn
-					(setf first-inter
-						(reduce (lambda (left right) 
-							(if (< (intersect-distance left) (intersect-distance right))
-								left
-								right))
-							intersections))
-					(set-pixel x y
-						(call-shader
-							(shape-shader
-								(intersect-shape first-inter))
-							first-inter))))))))
+			(set-pixel x y
+				(trace-ray
+					(screen-ray x y))))))
 
 ;; Scene Setup
 (defun setup-scene()
