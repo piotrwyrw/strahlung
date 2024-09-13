@@ -281,11 +281,9 @@
 			  	(dolist (shape *shapes*)
 				  	(let ((inter (ray-vs-shape ray shape)))
 						(when inter
-						  	(progn
-								(setf intersections
-								(setf intersections
-									(append intersections
-										(list inter)))))
+							(setf intersections
+								(append intersections
+									(list inter)))
 					)))
 				(when intersections (progn
 					(setf first-inter
