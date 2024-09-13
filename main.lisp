@@ -17,6 +17,11 @@
 
 (defvar *shading-functions* (make-hash-table))
 
+(defvar *default-shader-params*
+	(let ((table (make-hash-table)))
+		(setf (gethash 'color table) (list 255 50 50))
+		table))
+
 (defvar *shapes* nil)
 
 ;; This is used to add a bit of noise to the scene
@@ -161,7 +166,11 @@
 
 (defclass shape ()
 	((shader	:initarg :shader
-			:accessor shape-shader)))
+			:accessor shape-shader
+			:initform 'default-shader)
+	 (params	:initarg :shader-params
+			:accessor shape-shader-params
+			:initform *default-shader-params*)))
 
 (defclass sphere (shape)
 	((center	:initarg :center
@@ -263,16 +272,21 @@
 	(gethash id *shading-functions*))
 
 (defun call-shader (id _intersection)
-	(funcall (retrieve-shader-lambda id) _intersection))
+	(funcall (retrieve-shader-lambda id) _intersection
+		(shape-shader-params
+			(intersect-shape _intersection))))
 
-(defmacro defshader (name interId _lambda)
-	`(register-shader ,name (lambda (,interId) ,_lambda)))
+(defmacro defshader (name interId paramsId _lambda)
+	`(register-shader ,name (lambda (,interId ,paramsId) ,_lambda)))
 
-(defshader 'normal-shader inter
+(defshader 'normal-shader inter params
 	(vector-color
 		(shape-normal
 			(intersect-shape inter)
 			(intersect-point inter))))
+
+(defshader 'default-shader inter params
+	(gethash 'color params))
 
 (defun trace-all-rays ()
 	(dotimes (x *screen-width*)
@@ -306,17 +320,15 @@
 				:x 0.0
 				:y 0.0
 				:z 30.0)
-			:radius 5.0
-			:shader 'normal-shader)
+			:shader 'normal-shader
+			:radius 5.0)
 
 		(make-instance 'sphere
 			:center (make-instance 'vec3d
 				:x -2.0
 				:y 0.0
 				:z 10.0)
-			:radius 0.5
-			:shader 'normal-shader)))
-
+			:radius 0.5)))
 
 (defun main()
 	(format t "Rendering ...~&")
