@@ -24,13 +24,15 @@
 
 (defvar *shapes* nil)
 
+(defvar *ambient-color* (list 255 255 255))
+
 ;; This is used to add a bit of noise to the scene
 (defvar *ray-variance* 0.0025)
 
 (defun add-shapes (&rest shapes)
 	(setf *shapes* (nconc *shapes* shapes)))
 
-(defvar *epsilon* 0.000001)
+(defvar *epsilon* 0.01)
 
 ;; Image utilities
 
@@ -42,9 +44,15 @@
 
 (defun rgb-average (rgb-1 rgb-2)
 	(list
-		(floor (+ (nth 0 rgb-1) (nth 0 rgb-2) 2))
-		(floor (+ (nth 1 rgb-1) (nth 1 rgb-2) 2))
-		(floor (+ (nth 2 rgb-1) (nth 2 rgb-2) 2))))
+		(/ (+ (nth 0 rgb-1) (nth 0 rgb-2) 2))
+		(/ (+ (nth 1 rgb-1) (nth 1 rgb-2) 2))
+		(/ (+ (nth 2 rgb-1) (nth 2 rgb-2) 2))))
+
+(defun rgb-multiply (rgb-list fac)
+	(list
+		(* (nth 0 rgb-list) fac)
+		(* (nth 1 rgb-list) fac)
+		(* (nth 2 rgb-list) fac)))
 
 (defun i->xy (ix)
 	(list
@@ -66,6 +74,9 @@
 				(x (nth 0 xy-pair))
 				(y (nth 1 xy-pair))
 				(px (get-pixel x y)))
+			  	(setf (nth 0 px) (round (nth 0 px)))
+				(setf (nth 1 px) (round (nth 1 px)))
+				(setf (nth 2 px) (round (nth 2 px)))
 				(write-line
 					(format nil "~a ~a ~a"
 						(nth 0 px)
@@ -262,8 +273,8 @@
 (defmethod shape-normal ((shape sphere) (point vec3d))
 	(vector-normalize
 	  	(vector-sub
-			(sphere-center shape)
-			point)))
+			point
+			(sphere-center shape))))
 
 (defun register-shader (id fun)
 	(setf (gethash id *shading-functions*) fun))
@@ -271,25 +282,14 @@
 (defun retrieve-shader-lambda (id)
 	(gethash id *shading-functions*))
 
-(defun call-shader (id _intersection)
-	(funcall (retrieve-shader-lambda id) _intersection
-		(shape-shader-params
-			(intersect-shape _intersection))))
+(defun call-shader (id _intersection params)
+	(funcall (retrieve-shader-lambda id) _intersection params))
 
 (defmacro defshader (name interId paramsId _lambda)
 	`(register-shader ,name (lambda (,interId ,paramsId) ,_lambda)))
 
-(defshader 'normal-shader inter params
-	(vector-color
-		(shape-normal
-			(intersect-shape inter)
-			(intersect-point inter))))
-
-(defshader 'default-shader inter params
-	(gethash 'color params))
-
 (defun trace-ray (ray)
-	(let* ((intersections '()) (first-inter nil) (px-color nil))
+	(let* ((intersections '()) (first-inter nil) (px-color nil) (first-shape nil))
 		(dolist (shape *shapes*)
 			(let ((inter (ray-vs-shape ray shape)))
 				(when inter
@@ -303,13 +303,47 @@
 						left
 						right))
 					intersections))
-			(setf px-color (call-shader
-				(shape-shader
-					(intersect-shape first-inter))
-				first-inter))))
+			(progn
+			  	(setf first-shape (intersect-shape first-inter))
+				(if (gethash 'bounces (shape-shader-params first-shape))
+					nil
+					(setf (gethash 'bounces (shape-shader-params first-shape)) 0))
+				(setf (gethash 'bounces (shape-shader-params first-shape))
+					(+ (gethash 'bounces (shape-shader-params first-shape)) 1))
+				(if (> (gethash 'bounces (shape-shader-params first-shape)) 200)
+					(setf px-color *ambient-color*)
+					(setf px-color (call-shader
+						(shape-shader
+							(intersect-shape first-inter))
+						first-inter
+						(shape-shader-params first-shape))))
+				(setf (gethash 'bounces (shape-shader-params first-shape))
+					(- (gethash 'bounces (shape-shader-params first-shape)) 1)))))
 		(if px-color
 			px-color
-		(list 0 0 0))))
+		*ambient-color*)))
+
+(defshader 'normal-shader inter params
+	(vector-color
+		(shape-normal
+			(intersect-shape inter)
+			(intersect-point inter))))
+
+(defshader 'diffuse-shader inter params
+	(progn
+		(let* (normal
+			(shape-nor
+				(shape-normal
+					(intersect-shape inter)
+					(intersect-point inter)))
+			(raw-color (trace-ray
+				(make-instance 'ray
+					:origin (intersect-point inter)
+					:direction shape-nor))))
+	 	 (rgb-multiply raw-color 0.9))))
+
+(defshader 'default-shader inter params
+	(gethash 'color params))
 
 (defun trace-all-rays ()
 	(dotimes (x *screen-width*)
@@ -323,19 +357,19 @@
 	(add-shapes
 		(make-instance 'sphere
 			:center (make-instance 'vec3d
-				:x 0.0
+				:x -1.51
 				:y 0.0
-				:z 30.0)
-			:shader 'normal-shader
-			:radius 5.0)
+				:z 10.0)
+			:shader 'diffuse-shader
+			:radius 1.5)
 
 		(make-instance 'sphere
 			:center (make-instance 'vec3d
-				:x -2.0
+				:x 1.51
 				:y 0.0
-				:z 10.0)
-			:radius 0.5)))
-
+				:z 11.0)
+			:shader 'diffuse-shader
+			:radius 1.5)))
 (defun main()
 	(format t "Rendering ...~&")
 	(setup-scene)
