@@ -375,9 +375,14 @@
 (defun trace-all-rays ()
 	(dotimes (x *screen-width*)
 		(dotimes (y *screen-height*)
-			(set-pixel x y
-				(trace-ray
-					(screen-ray x y) nil)))))
+		  	(let ((color nil) (tmp-color nil))
+		  		(dotimes (sample 10)
+					(setf tmp-color (trace-ray
+						(screen-ray x y) nil))
+					(if (null color)
+						(setf color tmp-color)
+					(setf color (rgb-average color tmp-color))))
+				(set-pixel x y color)))))
 
 ;; Scene Setup
 (defun setup-scene()
