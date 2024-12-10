@@ -19,12 +19,10 @@
 
 (defvar *default-shader-params*
 	(let ((table (make-hash-table)))
-		(setf (gethash 'color table) (list 255.0d0 50.0d0 50.0d0))
+		(setf (gethash 'color table) (list 128.0d0 128.0d0 128.0d0))
 		table))
 
 (defvar *shapes* nil)
-
-(defvar *ambient-color* (list 255.0d0 255.0d0 255.0d0))
 
 ;; This is used to add a bit of noise to the scene
 (defvar *ray-variance* 0.0025)
@@ -304,6 +302,19 @@
 (defmacro defshader (name interId paramsId _lambda)
 	`(register-shader ,name (lambda (,interId ,paramsId) ,_lambda)))
 
+(defun sky-color (ray)
+  	(let*	((fade-factor (/ (+ 1.0d0 (vec-y (ray-direction ray))) 2.0d0))
+		(origin (list 255 255 255))
+		(target (list 116 185 255))
+		(deltae (list
+		       		(- (nth 0 target) (nth 0 origin))
+		      		(- (nth 1 target) (nth 1 origin))
+		       		(- (nth 2 target) (nth 2 origin)))))
+		(list
+			(+ (nth 0 origin) (* (nth 0 deltae) fade-factor))
+			(+ (nth 1 origin) (* (nth 1 deltae) fade-factor))
+			(+ (nth 2 origin) (* (nth 2 deltae) fade-factor)))))
+
 (defun trace-ray (ray ignoreShape)
 	(let* ((intersections '()) (first-inter nil) (px-color nil) (first-shape nil) (tmp-color nil))
 		(dolist (shape *shapes*)
@@ -329,7 +340,7 @@
 							(shape-shader-params first-shape))))))
 		(if px-color
 			px-color
-		*ambient-color*)))
+		(sky-color ray))))
 
 (defshader 'normal-shader inter params
 	(vector-color
@@ -349,7 +360,8 @@
 						:origin (intersect-point inter)
 						:direction (vector-random-hemisphere shape-nor))
 					(intersect-shape inter))))
-	 	 (mapcar (lambda (x) (* (float x) 0.8d0)) raw-color))))
+		  	(mapcar (lambda (x) (* (float x) 0.7d0)) raw-color))))
+
 
 (defshader 'default-shader inter params
 	(gethash 'color params))
@@ -370,21 +382,22 @@
 ;; Scene Setup
 (defun setup-scene()
 	(add-shapes
+	  	; The 'ground' sphere
 		(make-instance 'sphere
 			:center (make-instance 'vec3d
-				:x -10.0d0
-				:y 0.0d0
-				:z 45.0d0)
+				:x 0.0d0
+				:y -303.0d0
+				:z 20.0d0)
 			:shader 'diffuse-shader
-			:radius 10.0d0)
+			:radius 300.0d0)
 
 		(make-instance 'sphere
 			:center (make-instance 'vec3d
-				:x 10.0d0
+				:x 0.0d0
 				:y 0.0d0
-				:z 45.0d0)
+				:z 20.0d0)
 			:shader 'diffuse-shader
-			:radius 10.0d0)))
+			:radius 3.0d0)))
 (defun main()
 	(format t "Rendering ...~&")
 	(setup-scene)
