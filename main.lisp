@@ -10,6 +10,8 @@
 (defvar *screen-width* 1000)
 (defvar *screen-height* 1000)
 (defvar *focal-length* 3.0)
+(defvar *sample-count* 5)
+(defvar *max-bounces* 100)
 
 (defvar *pixels* (make-array
 	(list *screen-width* *screen-height*)
@@ -19,18 +21,19 @@
 
 (defvar *default-shader-params*
 	(let ((table (make-hash-table)))
-		(setf (gethash 'color table) (list 128.0d0 128.0d0 128.0d0))
+		(setf (gethash 'color table) (list 0.0d0 0.0d0 255.0d0))
+		(setf (gethash 'roughness table) 0.8d0)
 		table))
 
 (defvar *shapes* nil)
 
 ;; This is used to add a bit of noise to the scene
-(defvar *ray-variance* 0.0025)
+(defvar *ray-variance* 0.002)
 
 (defun add-shapes (&rest shapes)
 	(setf *shapes* (nconc *shapes* shapes)))
 
-(defvar *epsilon* 0.00000001d0)
+(defvar *epsilon* 0.00001d0)
 
 ;; Image utilities
 
@@ -296,16 +299,16 @@
 (defun retrieve-shader-lambda (id)
 	(gethash id *shading-functions*))
 
-(defun call-shader (id _intersection params)
-	(funcall (retrieve-shader-lambda id) _intersection params))
+(defun call-shader (id _intersection params depth)
+	(funcall (retrieve-shader-lambda id) _intersection params depth))
 
-(defmacro defshader (name interId paramsId _lambda)
-	`(register-shader ,name (lambda (,interId ,paramsId) ,_lambda)))
+(defmacro defshader (name interId paramsId depthId _lambda)
+	`(register-shader ,name (lambda (,interId ,paramsId ,depthId) ,_lambda)))
 
 (defun sky-color (ray)
   	(let*	((fade-factor (/ (+ 1.0d0 (vec-y (ray-direction ray))) 2.0d0))
 		(origin (list 255 255 255))
-		(target (list 128 179 255))
+		(target (list 212 230 255))
 		(deltae (list
 		       		(- (nth 0 target) (nth 0 origin))
 		      		(- (nth 1 target) (nth 1 origin))
@@ -315,7 +318,9 @@
 			(+ (nth 1 origin) (* (nth 1 deltae) fade-factor))
 			(+ (nth 2 origin) (* (nth 2 deltae) fade-factor)))))
 
-(defun trace-ray (ray ignoreShape)
+(defun trace-ray (ray ignoreShape depth)
+  	(if (> depth *max-bounces*)
+		(list 0 0 0)
 	(let* ((intersections '()) (first-inter nil) (px-color nil) (first-shape nil) (tmp-color nil))
 		(dolist (shape *shapes*)
 		  	(if (or (null ignoreShape) (not (equal (sphere-center shape) (sphere-center ignoreShape))))
@@ -337,36 +342,41 @@
 							(shape-shader
 								(intersect-shape first-inter))
 							first-inter
-							(shape-shader-params first-shape))))))
+							(shape-shader-params first-shape)
+							(+ depth 1))))))
 		(if px-color
 			px-color
-		(sky-color ray))))
+		(sky-color ray)))))
 
-(defshader 'normal-shader inter params
+(defshader 'normal-shader inter params depth
 	(vector-color
 		(shape-normal
 			(intersect-shape inter)
 			(intersect-point inter))))
 
-(defshader 'diffuse-shader inter params
+(defshader 'diffuse-shader inter params depth
 	(progn
 		(let* ((shape (intersect-shape inter))
 		       (shape-nor
 				(shape-normal
 					shape
 					(intersect-point inter)))
-			(raw-color (trace-ray
-					(make-instance 'ray
-						:origin (intersect-point inter)
-						:direction (vector-add (vector-random-unit) shape-nor))
-					(intersect-shape inter))))
-		  	(mapcar (lambda (x) (* (float x) 0.5d0)) raw-color))))
+		        (ray-dir (vector-add (vector-random-unit) shape-nor))
+			(raw-color nil))
+		  	(if (< (vector-dot shape-nor ray-dir) 0)
+				(setf ray-dir (vector-invert ray-dir))
+				nil)
+			(setf raw-color (trace-ray (make-instance 'ray
+								  :origin (intersect-point inter)
+								  :direction ray-dir)
+						   shape depth))
+		  	(mapcar (lambda (x) (* (float x) (gethash 'roughness params))) raw-color))))
 
 
-(defshader 'default-shader inter params
+(defshader 'default-shader inter params depth
 	(gethash 'color params))
 
-(defshader 'light-shader inter params
+(defshader 'light-shader inter params depth
 	(let* ((dot (/ (+ 1.0d0 (vector-dot (shape-normal (intersect-shape inter) (intersect-point inter))
 					    (vector-normalize (make-instance 'vec3d :x 0.0d0 :y -0.5d0 :z -0.5d0)))) 2.0d0))
 	      (intensity (/ (+ dot 1.0d0) 2.0d0)))
@@ -376,9 +386,9 @@
 	(dotimes (x *screen-width*)
 		(dotimes (y *screen-height*)
 		  	(let ((color nil) (tmp-color nil))
-		  		(dotimes (sample 10)
+		  		(dotimes (sample *sample-count*)
 					(setf tmp-color (trace-ray
-						(screen-ray x y) nil))
+						(screen-ray x y) nil 0))
 					(if (null color)
 						(setf color tmp-color)
 					(setf color (rgb-average color tmp-color))))
@@ -402,7 +412,15 @@
 				:y 0.0d0
 				:z 20.0d0)
 			:shader 'diffuse-shader
-			:radius 3.0d0)))
+			:radius 3.0d0)
+		
+		(make-instance 'sphere
+			:center (make-instance 'vec3d
+				:x 2.5d0
+				:y -2.0d0
+				:z 17.0d0)
+			:shader 'diffuse-shader
+			:radius 1.0d0)))
 (defun main()
 	(format t "Rendering ...~&")
 	(setup-scene)
