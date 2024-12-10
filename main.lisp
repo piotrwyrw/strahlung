@@ -7,24 +7,24 @@
 
 (in-package :strahlung)
 
-(defvar *screen-width* 500)
-(defvar *screen-height* 500)
+(defvar *screen-width* 1000)
+(defvar *screen-height* 1000)
 (defvar *focal-length* 3.0)
 
 (defvar *pixels* (make-array
 	(list *screen-width* *screen-height*)
-	:initial-element (list 0 0 0)))
+	:initial-element (list 0.0d0 0.0d0 0.0d0)))
 
 (defvar *shading-functions* (make-hash-table))
 
 (defvar *default-shader-params*
 	(let ((table (make-hash-table)))
-		(setf (gethash 'color table) (list 255 50 50))
+		(setf (gethash 'color table) (list 255.0d0 50.0d0 50.0d0))
 		table))
 
 (defvar *shapes* nil)
 
-(defvar *ambient-color* (list 255 255 255))
+(defvar *ambient-color* (list 255.0d0 255.0d0 255.0d0))
 
 ;; This is used to add a bit of noise to the scene
 (defvar *ray-variance* 0.0025)
@@ -32,7 +32,7 @@
 (defun add-shapes (&rest shapes)
 	(setf *shapes* (nconc *shapes* shapes)))
 
-(defvar *epsilon* 0.01)
+(defvar *epsilon* 0.000001d0)
 
 ;; Image utilities
 
@@ -44,15 +44,9 @@
 
 (defun rgb-average (rgb-1 rgb-2)
 	(list
-		(/ (+ (nth 0 rgb-1) (nth 0 rgb-2) 2))
-		(/ (+ (nth 1 rgb-1) (nth 1 rgb-2) 2))
-		(/ (+ (nth 2 rgb-1) (nth 2 rgb-2) 2))))
-
-(defun rgb-multiply (rgb-list fac)
-	(list
-		(* (nth 0 rgb-list) fac)
-		(* (nth 1 rgb-list) fac)
-		(* (nth 2 rgb-list) fac)))
+		(/ (+ (nth 0 rgb-1) (nth 0 rgb-2)) 2.0d0)
+		(/ (+ (nth 1 rgb-1) (nth 1 rgb-2)) 2.0d0)
+		(/ (+ (nth 2 rgb-1) (nth 2 rgb-2)) 2.0d0)))
 
 (defun i->xy (ix)
 	(list
@@ -126,13 +120,23 @@
 			:y (+ (vec-y vec) (vec-y another))
 			:z (+ (vec-z vec) (vec-z another))))
 
+(defun vector-invert (vec)
+	(make-instance 'vec3d
+		       :x (* -1.0d0 (vec-x vec))
+		       :y (* -1.0d0 (vec-y vec))
+		       :z (* -1.0d0 (vec-z vec))))
+
 (defun vector-sub (vec another)
 	(make-instance 'vec3d
 			:x (- (vec-x vec) (vec-x another))
 			:y (- (vec-y vec) (vec-y another))
 			:z (- (vec-z vec) (vec-z another))))
 
-
+(defun vector-dot (a b)
+  	(+
+		(* (vec-x a) (vec-x b))
+		(* (vec-y a) (vec-y b))
+		(* (vec-z a) (vec-z b))))
 
 (defun vector-color (vec)
 	(let ((norm (vector-normalize vec)))
@@ -140,6 +144,18 @@
 			(floor (+ 128 (* 128 (vec-x norm))))
 			(floor (+ 128 (* 128 (vec-y norm))))
 			(floor (+ 128 (* 128 (vec-z norm)))))))
+
+(defun random-float ()
+	(- (random 2.0d0) 1.0d0))
+
+(defun vector-random-unit ()
+	(vector-normalize (make-instance 'vec3d :x (random-float) :y (random-float) :z (random-float))))
+
+(defun vector-random-hemisphere (normal)
+	(let ((dir (vector-random-unit)))
+		(if (< (vector-dot dir normal) 0.0d0)
+			(vector-random-hemisphere normal)
+		dir)))
 
 (defclass ray ()
 	((origin	:initarg :origin
@@ -209,13 +225,13 @@
 
 (defun quadratic-solve (a b c)
 	"Solve the quadratic equation and return a list of results or NIL"
-	(let* ((quad-disc (- (square b) (* 4 a c))) (result nil) (quad-denominator (* 2 a)) (tmp-res 0))
-	  	(cond	((>=	quad-disc 0) (progn
-						(setf tmp-res (/ (+ (* -1 b) (sqrt quad-disc)) quad-denominator))
+	(let* ((quad-disc (- (square b) (* 4.d0 a c))) (result nil) (quad-denominator (* 2 a)) (tmp-res 0))
+	  	(cond	((>=	quad-disc 0.0d0) (progn
+						(setf tmp-res (/ (+ (* -1.0d0 b) (sqrt quad-disc)) quad-denominator))
 						(if (> tmp-res *epsilon*)
 							(setf result (append result (list tmp-res)))))))
-		(cond	((>	quad-disc 0) (progn
-						(setf tmp-res (/ (- (* -1 b) (sqrt quad-disc)) quad-denominator))
+		(cond	((>	quad-disc 0.0d0) (progn
+						(setf tmp-res (/ (- (* -1.0d0 b) (sqrt quad-disc)) quad-denominator))
 						(if (> tmp-res *epsilon*)
 							(setf result (append result (list tmp-res)))))))
 		result))
@@ -242,23 +258,23 @@
 
 		(a (+ (square Dx) (square Dy) (square Dz)))
 
-		(b (+	(* -2 Cx Dx)
-			(* -2 Cy Dy)
-			(* -2 Cz Dz)
-			(* 2 Dx Ox)
-			(* 2 Dy Oy)
-			(* 2 Dz Oz)))
+		(b (+	(* -2.0d0 Cx Dx)
+			(* -2.0d0 Cy Dy)
+			(* -2.0d0 Cz Dz)
+			(* 2.0d0 Dx Ox)
+			(* 2.0d0 Dy Oy)
+			(* 2.0d0 Dz Oz)))
 
 	  	(c (+	(square Oz)
-			(* -2 Cz Oz)
+			(* -2.0d0 Cz Oz)
 			(square Cx)
-			(* -2 Cx Ox)
+			(* -2.0d0 Cx Ox)
 			(square Cy)
-			(* -2 Cy Oy)
+			(* -2.0d0 Cy Oy)
 			(square Cz)
 			(square Ox)
 			(square Oy)
-			(* -1 (square r))))
+			(* -1.0d0 (square r))))
 
 		(dst (quadratic-solve a b c)))
 
@@ -288,14 +304,15 @@
 (defmacro defshader (name interId paramsId _lambda)
 	`(register-shader ,name (lambda (,interId ,paramsId) ,_lambda)))
 
-(defun trace-ray (ray)
-	(let* ((intersections '()) (first-inter nil) (px-color nil) (first-shape nil))
+(defun trace-ray (ray ignoreShape)
+	(let* ((intersections '()) (first-inter nil) (px-color nil) (first-shape nil) (tmp-color nil))
 		(dolist (shape *shapes*)
-			(let ((inter (ray-vs-shape ray shape)))
-				(when inter
-					(setf intersections
-						(append intersections
-						(list inter))))))
+		  	(if (or (null ignoreShape) (not (equal (sphere-center shape) (sphere-center ignoreShape))))
+				(let ((inter (ray-vs-shape ray shape)))
+					(when inter
+						(setf intersections
+							(append intersections
+							(list inter)))))))
 		(when intersections (progn
 			(setf first-inter
 				(reduce (lambda (left right) 
@@ -305,20 +322,11 @@
 					intersections))
 			(progn
 			  	(setf first-shape (intersect-shape first-inter))
-				(if (gethash 'bounces (shape-shader-params first-shape))
-					nil
-					(setf (gethash 'bounces (shape-shader-params first-shape)) 0))
-				(setf (gethash 'bounces (shape-shader-params first-shape))
-					(+ (gethash 'bounces (shape-shader-params first-shape)) 1))
-				(if (> (gethash 'bounces (shape-shader-params first-shape)) 200)
-					(setf px-color *ambient-color*)
-					(setf px-color (call-shader
-						(shape-shader
-							(intersect-shape first-inter))
-						first-inter
-						(shape-shader-params first-shape))))
-				(setf (gethash 'bounces (shape-shader-params first-shape))
-					(- (gethash 'bounces (shape-shader-params first-shape)) 1)))))
+				(setf px-color (call-shader
+							(shape-shader
+								(intersect-shape first-inter))
+							first-inter
+							(shape-shader-params first-shape))))))
 		(if px-color
 			px-color
 		*ambient-color*)))
@@ -331,45 +339,52 @@
 
 (defshader 'diffuse-shader inter params
 	(progn
-		(let* (normal
-			(shape-nor
+		(let* ((shape (intersect-shape inter))
+		       (shape-nor
 				(shape-normal
-					(intersect-shape inter)
+					shape
 					(intersect-point inter)))
 			(raw-color (trace-ray
-				(make-instance 'ray
-					:origin (intersect-point inter)
-					:direction shape-nor))))
-	 	 (rgb-multiply raw-color 0.9))))
+					(make-instance 'ray
+						:origin (intersect-point inter)
+						:direction (vector-random-hemisphere shape-nor))
+					(intersect-shape inter))))
+	 	 (mapcar (lambda (x) (* (float x) 0.8d0)) raw-color))))
 
 (defshader 'default-shader inter params
 	(gethash 'color params))
+
+(defshader 'light-shader inter params
+	(let* ((dot (/ (+ 1.0d0 (vector-dot (shape-normal (intersect-shape inter) (intersect-point inter))
+					    (vector-normalize (make-instance 'vec3d :x 0.0d0 :y -0.5d0 :z -0.5d0)))) 2.0d0))
+	      (intensity (/ (+ dot 1.0d0) 2.0d0)))
+		(list (* 255.0d0 intensity) 0.0d0 0.0d0)))
 
 (defun trace-all-rays ()
 	(dotimes (x *screen-width*)
 		(dotimes (y *screen-height*)
 			(set-pixel x y
 				(trace-ray
-					(screen-ray x y))))))
+					(screen-ray x y) nil)))))
 
 ;; Scene Setup
 (defun setup-scene()
 	(add-shapes
 		(make-instance 'sphere
 			:center (make-instance 'vec3d
-				:x -1.51
-				:y 0.0
-				:z 10.0)
+				:x -10.0d0
+				:y 0.0d0
+				:z 45.0d0)
 			:shader 'diffuse-shader
-			:radius 1.5)
+			:radius 10.0d0)
 
 		(make-instance 'sphere
 			:center (make-instance 'vec3d
-				:x 1.51
-				:y 0.0
-				:z 11.0)
+				:x 10.0d0
+				:y 0.0d0
+				:z 45.0d0)
 			:shader 'diffuse-shader
-			:radius 1.5)))
+			:radius 10.0d0)))
 (defun main()
 	(format t "Rendering ...~&")
 	(setup-scene)
