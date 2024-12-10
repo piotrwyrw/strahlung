@@ -30,7 +30,7 @@
 (defun add-shapes (&rest shapes)
 	(setf *shapes* (nconc *shapes* shapes)))
 
-(defvar *epsilon* 0.000001d0)
+(defvar *epsilon* 0.00000001d0)
 
 ;; Image utilities
 
@@ -305,7 +305,7 @@
 (defun sky-color (ray)
   	(let*	((fade-factor (/ (+ 1.0d0 (vec-y (ray-direction ray))) 2.0d0))
 		(origin (list 255 255 255))
-		(target (list 116 185 255))
+		(target (list 128 179 255))
 		(deltae (list
 		       		(- (nth 0 target) (nth 0 origin))
 		      		(- (nth 1 target) (nth 1 origin))
@@ -358,9 +358,9 @@
 			(raw-color (trace-ray
 					(make-instance 'ray
 						:origin (intersect-point inter)
-						:direction (vector-random-hemisphere shape-nor))
+						:direction (vector-add (vector-random-unit) shape-nor))
 					(intersect-shape inter))))
-		  	(mapcar (lambda (x) (* (float x) 0.7d0)) raw-color))))
+		  	(mapcar (lambda (x) (* (float x) 0.5d0)) raw-color))))
 
 
 (defshader 'default-shader inter params
